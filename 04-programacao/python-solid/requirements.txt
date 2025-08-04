@@ -1,0 +1,40 @@
+# Requirements for Python Cloud Manager Application
+
+# Core dependencies
+boto3>=1.28.0              # AWS SDK for Python
+# Azure SDK
+azure-identity==1.15.0
+azure-mgmt-core==1.4.0
+azure-mgmt-compute==30.3.0
+azure-mgmt-resource==23.1.1
+azure-mgmt-compute>=30.0.0  # Azure compute management
+azure-mgmt-resource>=23.0.0 # Azure resource management
+azure-servicebus>=7.11.0   # Azure Service Bus client
+
+# Configuration and data handling
+PyYAML>=6.0                # YAML configuration parsing
+pydantic>=2.0.0            # Data validation and serialization
+python-dotenv>=1.0.0       # Environment variable loading
+
+# Logging and monitoring
+structlog>=23.0.0          # Structured logging
+prometheus-client>=0.17.0  # Prometheus metrics
+opentelemetry-api>=1.19.0  # Distributed tracing
+
+# HTTP and networking
+requests>=2.31.0           # HTTP client
+urllib3>=1.26.0            # HTTP library
+certifi>=2023.0.0          # SSL certificates
+
+# Development and testing
+pytest>=7.4.0             # Testing framework
+pytest-cov>=4.1.0         # Coverage reporting
+pytest-mock>=3.11.0       # Mocking utilities
+black>=23.0.0              # Code formatting
+flake8>=6.0.0              # Linting
+mypy>=1.5.0                # Type checking
+
+# Optional dependencies for enhanced features
+redis>=4.6.0               # Caching (optional)
+psycopg2-binary>=2.9.0     # PostgreSQL client (optional)
+cryptography>=41.0.0       # Encryption utilities

@@ -1,0 +1,222 @@
+# Cloud Providers Configuration
+# This file defines the configuration for different cloud providers
+# Used by the ProviderFactory to create and configure provider instances
+
+providers:
+  # Amazon Web Services Configuration
+  aws:
+    default: true  # This will be the default provider if none is specified
+    region: "us-east-1"
+    
+    # Credentials configuration
+    credentials:
+      type: "environment"  # Options: environment, file, iam_role, profile
+      # profile: "default"  # AWS profile name if using 'profile' type
+      # credentials_file: "~/.aws/credentials"  # Path if using 'file' type
+    
+    # Default settings for EC2 instances
+    instance_defaults:
+      ami_id: "ami-0c02fb55956c7d316"  # Amazon Linux 2 AMI
+      security_groups: ["default"]
+      key_pair: "my-keypair"
+      subnet_id: null  # Will use default VPC subnet
+      
+      # Instance type mappings for size abstraction
+      size_mappings:
+        small: "t3.micro"
+        medium: "t3.small"
+        large: "t3.medium"
+        xlarge: "t3.large"
+    
+    # Resource tagging defaults
+    default_tags:
+      Environment: "production"
+      ManagedBy: "CloudManager"
+      CostCenter: "engineering"
+      Project: "multi-cloud-demo"
+  
+  # Microsoft Azure Configuration  
+  azure:
+    default: false
+    region: "East US"
+    
+    # Credentials configuration
+    credentials:
+      type: "environment"  # Options: environment, service_principal, managed_identity
+      # tenant_id: "your-tenant-id"  # Required for service_principal
+      # client_id: "your-client-id"  # Required for service_principal
+      # client_secret: "your-client-secret"  # Required for service_principal
+    
+    # Default settings for Virtual Machines
+    instance_defaults:
+      image:
+        publisher: "Canonical"
+        offer: "0001-com-ubuntu-server-focal"
+        sku: "20_04-lts-gen2"
+        version: "latest"
+      
+      resource_group: "rg-test-vm"
+      network_security_group: "cloud-manager-nsg"
+      virtual_network: "cloud-manager-vnet"
+      subnet: "default"
+      
+      # VM size mappings for size abstraction
+      size_mappings:
+        small: "Standard_B1s"  # VM mais barata: 1 vCPU, 1GB RAM
+        medium: "Standard_B2s"
+        large: "Standard_B4ms"
+        xlarge: "Standard_D4s_v3"
+    
+    # Resource tagging defaults
+    default_tags:
+      Environment: "production"
+      ManagedBy: "CloudManager"
+      CostCenter: "engineering"
+      Project: "multi-cloud-demo"
+
+# Global application configuration
+app:
+  # Logging configuration
+  logging:
+    level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+    format: "json"  # json, text
+    enable_file_logging: true
+    log_file: "logs/cloud-manager.log"
+    max_log_size_mb: 10
+    backup_count: 5
+  
+  # Monitoring and metrics
+  monitoring:
+    enabled: true
+    metrics_provider: "prometheus"  # prometheus, datadog, cloudwatch
+    health_check_interval: 30  # seconds
+    
+    # Prometheus configuration
+    prometheus:
+      port: 9090
+      metrics_path: "/metrics"
+      enable_detailed_metrics: true
+  
+  # Retry and timeout configuration
+  resilience:
+    max_retries: 3
+    retry_backoff_factor: 2
+    retry_backoff_max: 30  # seconds
+    request_timeout: 60  # seconds
+    connection_timeout: 10  # seconds
+  
+  # Caching configuration
+  caching:
+    enabled: true
+    provider_info_ttl: 300  # seconds (5 minutes)
+    instance_list_ttl: 60   # seconds (1 minute)
+    
+# Feature flags for enabling/disabling functionality
+features:
+  # Multi-provider support
+  multi_provider: true
+  
+  # Automatic resource tagging
+  auto_tagging: true
+  
+  # Cost tracking and reporting
+  cost_tracking: false
+  
+  # Security scanning of instances
+  security_scanning: false
+  
+  # Backup and disaster recovery
+  backup_management: false
+  
+  # Network security group management
+  network_security: true
+  
+  # Load balancer integration
+  load_balancer_integration: false
+
+# Security configuration
+security:
+  # Encryption settings
+  encryption:
+    encrypt_at_rest: true
+    encrypt_in_transit: true
+    key_rotation_days: 90
+  
+  # Access control
+  access_control:
+    require_mfa: false
+    session_timeout_minutes: 60
+    max_concurrent_sessions: 5
+  
+  # Audit logging
+  audit:
+    enabled: true
+    log_all_operations: true
+    retain_logs_days: 365
+
+# Environment-specific overrides
+# These can be used to override settings for different environments
+environments:
+  development:
+    providers:
+      aws:
+        region: "us-west-2"
+        instance_defaults:
+          security_groups: ["dev-sg"]
+      azure:
+        region: "West US 2"
+        instance_defaults:
+          resource_group: "dev-rg"
+    
+    app:
+      logging:
+        level: "DEBUG"
+      monitoring:
+        enabled: false
+    
+    features:
+      cost_tracking: false
+      security_scanning: false
+  
+  staging:
+    providers:
+      aws:
+        region: "us-east-1"
+        instance_defaults:
+          security_groups: ["staging-sg"]
+      azure:
+        region: "East US"
+        instance_defaults:
+          resource_group: "staging-rg"
+    
+    app:
+      logging:
+        level: "INFO"
+      monitoring:
+        enabled: true
+    
+    features:
+      cost_tracking: true
+      security_scanning: true
+  
+  production:
+    providers:
+      aws:
+        region: "us-east-1"
+        instance_defaults:
+          security_groups: ["prod-sg"]
+      azure:
+        region: "East US"
+        instance_defaults:
+          resource_group: "prod-rg"
+    
+    app:
+      logging:
+        level: "WARNING"
+      monitoring:
+        enabled: true
+    
+    features:
+      cost_tracking: true
+      security_scanning: true
+      backup_management: true
