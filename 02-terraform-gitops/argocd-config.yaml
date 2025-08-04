@@ -1,0 +1,290 @@
+# ArgoCD GitOps Configuration
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: argocd
+  labels:
+    name: argocd
+    app.kubernetes.io/part-of: argocd
+
+---
+# ArgoCD Server Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-server-config
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-server-config
+    app.kubernetes.io/part-of: argocd
+data:
+  # Server configuration
+  url: https://argocd.production.local
+  insecure: "false"
+  
+  # OIDC Configuration for SSO
+  oidc.config: |
+    name: Corporate SSO
+    issuer: https://login.microsoftonline.com/tenant-id/v2.0
+    clientId: argocd-client-id
+    clientSecret: $oidc.clientSecret
+    requestedScopes: ["openid", "profile", "email", "groups"]
+    requestedIDTokenClaims: {"groups": {"essential": true}}
+  
+  # Repository credentials template
+  repository.credentials: |
+    - url: https://github.com/kcsdevops
+      passwordSecret:
+        name: github-repo-secret
+        key: password
+      usernameSecret:
+        name: github-repo-secret
+        key: username
+
+---
+# ArgoCD RBAC Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-rbac-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-rbac-cm
+    app.kubernetes.io/part-of: argocd
+data:
+  policy.default: role:readonly
+  policy.csv: |
+    # Admin role - full access
+    p, role:admin, applications, *, */*, allow
+    p, role:admin, clusters, *, *, allow
+    p, role:admin, repositories, *, *, allow
+    p, role:admin, certificates, *, *, allow
+    p, role:admin, projects, *, *, allow
+    p, role:admin, accounts, *, *, allow
+    p, role:admin, gpgkeys, *, *, allow
+    
+    # DevOps role - production access
+    p, role:devops, applications, *, */production-*, allow
+    p, role:devops, applications, *, */staging-*, allow
+    p, role:devops, applications, get, */*, allow
+    p, role:devops, repositories, get, *, allow
+    p, role:devops, clusters, get, *, allow
+    
+    # Developer role - limited access
+    p, role:developer, applications, get, */dev-*, allow
+    p, role:developer, applications, sync, */dev-*, allow
+    p, role:developer, applications, action/*, */dev-*, allow
+    p, role:developer, repositories, get, *, allow
+    
+    # QA role - staging access
+    p, role:qa, applications, get, */staging-*, allow
+    p, role:qa, applications, sync, */staging-*, allow
+    p, role:qa, repositories, get, *, allow
+    
+    # Group mappings (from OIDC claims)
+    g, devops-team, role:admin
+    g, platform-team, role:devops
+    g, development-team, role:developer
+    g, qa-team, role:qa
+  
+  # Session timeout
+  policy.matchMode: glob
+
+---
+# Root Application (App of Apps Pattern)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root-app
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  labels:
+    app.kubernetes.io/name: root-app
+    app.kubernetes.io/part-of: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/kcsdevops/Desafio-senior-cloud-engineer.git
+    targetRevision: HEAD
+    path: argocd/applications
+    directory:
+      recurse: true
+      include: "*.yaml"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m0s
+
+---
+# Infrastructure Applications
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: infrastructure-apps
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/kcsdevops/Desafio-senior-cloud-engineer.git
+    targetRevision: HEAD
+    path: kubernetes/infrastructure
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 2m0s
+
+---
+# Production Applications
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: production-apps
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: production
+  source:
+    repoURL: https://github.com/kcsdevops/Desafio-senior-cloud-engineer.git
+    targetRevision: main
+    path: kubernetes/applications/production
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: production
+  syncPolicy:
+    automated:
+      prune: false  # Manual approval for production
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 2
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m0s
+
+---
+# Staging Applications
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: staging-apps
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/kcsdevops/Desafio-senior-cloud-engineer.git
+    targetRevision: develop
+    path: kubernetes/applications/staging
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: staging
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m0s
+
+---
+# ArgoCD Project for Production
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: production
+  namespace: argocd
+spec:
+  description: Production environment project
+  
+  # Source repositories
+  sourceRepos:
+  - https://github.com/kcsdevops/Desafio-senior-cloud-engineer.git
+  - https://helm.releases.hashicorp.com
+  - https://charts.jetstack.io
+  - https://kubernetes-sigs.github.io/aws-load-balancer-controller
+  
+  # Allowed destinations
+  destinations:
+  - namespace: production
+    server: https://kubernetes.default.svc
+  - namespace: monitoring
+    server: https://kubernetes.default.svc
+  - namespace: ingress-nginx
+    server: https://kubernetes.default.svc
+  
+  # Cluster resource whitelist
+  clusterResourceWhitelist:
+  - group: ""
+    kind: Namespace
+  - group: "rbac.authorization.k8s.io"
+    kind: ClusterRole
+  - group: "rbac.authorization.k8s.io"
+    kind: ClusterRoleBinding
+  
+  # Namespace resource whitelist
+  namespaceResourceWhitelist:
+  - group: ""
+    kind: "*"
+  - group: "apps"
+    kind: "*"
+  - group: "batch"
+    kind: "*"
+  - group: "extensions"
+    kind: "*"
+  - group: "networking.k8s.io"
+    kind: "*"
+  
+  # Roles for production project
+  roles:
+  - name: production-admin
+    description: Production admin role
+    policies:
+    - p, proj:production:production-admin, applications, *, production/*, allow
+    groups:
+    - devops-team
+  
+  - name: production-readonly
+    description: Production readonly role
+    policies:
+    - p, proj:production:production-readonly, applications, get, production/*, allow
+    groups:
+    - qa-team
+    - development-team
