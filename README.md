@@ -90,5 +90,4 @@ Cada seção contém:
 **Posição:** Senior Cloud Engineer  
 **Tel:** 11 93297-7812 
 
----
-*Este projeto demonstra competências avançadas em arquitetura cloud, automação, programação e melhores práticas DevOps.*
+
