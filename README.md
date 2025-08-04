@@ -1,7 +1,7 @@
 # Teste Técnico - Senior Cloud Engineer
 
 ## Objetivo
-Avaliar a capacidade de projetar, automatizar, codificar e escalar ambientes cloud modernos, utilizando práticas avançadas de DevOps, IaC, GitOps e segurança em AWS e Azure.
+Desenvolver uma arquitetura em multi-cloud, vaga emprego.
 
 ## Estrutura do Projeto
 
